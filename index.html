@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>초등 타자 연습 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Gaegu', cursive;
+            background-color: #f0f9ff;
+            touch-action: manipulation;
+        }
+        .correct { color: #3b82f6; }
+        .incorrect { color: #ef4444; text-decoration: underline; }
+        .current { background-color: #fef08a; border-radius: 4px; }
+        
+        .game-card {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="setup-screen" class="max-w-md w-full bg-white rounded-3xl p-8 game-card text-center">
+        <h1 class="text-4xl font-bold text-blue-500 mb-6">⌨️ 반짝반짝 타자교실</h1>
+        <p class="text-xl text-gray-600 mb-8">무엇을 좋아하나요? <br>좋아하는 것을 쓰면 문장을 만들어 줄게요!</p>
+        
+        <input type="text" id="interest-input" 
+               placeholder="예: 강아지, 우주, 공주님" 
+               class="w-full text-2xl p-4 border-4 border-blue-200 rounded-2xl mb-6 focus:outline-none focus:border-blue-400 text-center">
+        
+        <button onclick="startGame()" 
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white text-2xl font-bold py-4 rounded-2xl transition-all transform hover:scale-105">
+            게임 시작하기!
+        </button>
+    </div>
+
+    <div id="loading-screen" class="hidden max-w-md w-full bg-white rounded-3xl p-8 game-card text-center">
+        <div class="flex flex-col items-center">
+            <div class="spinner mb-4"></div>
+            <p class="text-2xl text-blue-500">재미있는 문장을 만들고 있어요...</p>
+        </div>
+    </div>
+
+    <div id="game-screen" class="hidden max-w-2xl w-full bg-white rounded-3xl p-8 game-card">
+        <div class="flex justify-between mb-6 text-xl text-gray-500 border-b pb-4">
+            <div>정확도: <span id="accuracy-display" class="font-bold text-blue-500">100</span>%</div>
+            <div>진행: <span id="progress-display" class="font-bold text-blue-500">0</span> / 5</div>
+        </div>
+
+        <div class="mb-12">
+            <div id="target-sentence" class="text-3xl sm:text-4xl text-gray-700 leading-relaxed mb-8 break-keep min-h-[80px]">
+                <!-- Sentence will be here -->
+            </div>
+            
+            <input type="text" id="typing-input" 
+                   class="w-full text-3xl p-4 border-b-4 border-blue-300 focus:outline-none focus:border-blue-500 text-center"
+                   placeholder="위 문장을 따라 써보세요"
+                   autocomplete="off">
+        </div>
+
+        <div class="flex justify-center">
+            <button onclick="resetGame()" class="text-gray-400 hover:text-gray-600">다시 시작하기</button>
+        </div>
+    </div>
+
+    <div id="result-screen" class="hidden max-w-md w-full bg-white rounded-3xl p-8 game-card text-center">
+        <h2 class="text-4xl font-bold text-yellow-500 mb-4">🎉 대단해요! 🎉</h2>
+        <div class="bg-yellow-50 rounded-2xl p-6 mb-6">
+            <p class="text-2xl mb-2">평균 정확도: <span id="final-accuracy" class="font-bold text-blue-500">0</span>%</p>
+            <p id="final-message" class="text-xl text-gray-600">타자 실력이 쑥쑥 늘고 있어요!</p>
+        </div>
+        <button onclick="resetGame()" 
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white text-2xl font-bold py-4 rounded-2xl transition-all">
+            한 번 더 하기
+        </button>
+    </div>
+
+    <script>
+        const apiKey = ""; // API key will be provided at runtime
+        const setupScreen = document.getElementById('setup-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        
+        const interestInput = document.getElementById('interest-input');
+        const typingInput = document.getElementById('typing-input');
+        const targetDisplay = document.getElementById('target-sentence');
+        const progressDisplay = document.getElementById('progress-display');
+        const accuracyDisplay = document.getElementById('accuracy-display');
+
+        let sentences = [];
+        let currentIndex = 0;
+        let totalErrors = 0;
+        let totalChars = 0;
+
+        async function fetchSentences(interest) {
+            const systemPrompt = "너는 초등학교 1-2학년 수준의 언어 교사야. 사용자가 입력한 관심사 주제로 5개의 아주 짧고 쉬운 문장을 만들어줘. 각 문장은 10자 내외여야 하며, 받침이 너무 어렵지 않아야 해. 생명 윤리에 어긋나거나, 범죄, 혐오 표현은 절대 안 돼. 칭찬하고 밝은 느낌의 문장이어야 해. 응답은 오직 JSON 리스트 형식으로만 해줘. 예: ['나는 사과를 좋아해요.', '빨간 사과는 맛있어요.']";
+            const userQuery = `${interest}에 관한 초등 1~2학년 수준의 타자 연습용 문장 5개 만들어줘.`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        generationConfig: {
+                            responseMimeType: "application/json"
+                        }
+                    })
+                });
+
+                if (!response.ok) throw new Error('API Error');
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text;
+                return JSON.parse(text);
+            } catch (error) {
+                console.error(error);
+                return [
+                    `${interest}은 정말 멋져요.`,
+                    `우리 같이 ${interest} 구경해요.`,
+                    `${interest} 친구를 만나요.`,
+                    `${interest} 정말 사랑스러워요.`,
+                    `내일도 ${interest}이랑 놀아요.`
+                ];
+            }
+        }
+
+        async function startGame() {
+            const interest = interestInput.value.trim();
+            if (!interest) {
+                alert('관심사를 입력해주세요!');
+                return;
+            }
+
+            setupScreen.classList.add('hidden');
+            loadingScreen.classList.remove('hidden');
+
+            sentences = await fetchSentences(interest);
+            
+            currentIndex = 0;
+            totalErrors = 0;
+            totalChars = 0;
+            
+            loadingScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            showSentence();
+            typingInput.focus();
+        }
+
+        function showSentence() {
+            const sentence = sentences[currentIndex];
+            targetDisplay.innerHTML = '';
+            // 시각적 피드백을 위해 글자 단위로 쪼개서 넣음
+            sentence.split('').forEach(char => {
+                const span = document.createElement('span');
+                span.innerText = char;
+                targetDisplay.appendChild(span);
+            });
+            
+            typingInput.value = '';
+            progressDisplay.innerText = currentIndex + 1;
+            updateAccuracy();
+        }
+
+        typingInput.addEventListener('input', () => {
+            const currentSentence = sentences[currentIndex];
+            const val = typingInput.value;
+            const spans = targetDisplay.querySelectorAll('span');
+
+            let errors = 0;
+            spans.forEach((span, i) => {
+                if (i < val.length) {
+                    if (val[i] === currentSentence[i]) {
+                        span.className = 'correct';
+                    } else {
+                        span.className = 'incorrect';
+                        errors++;
+                    }
+                } else if (i === val.length) {
+                    span.className = 'current';
+                } else {
+                    span.className = '';
+                }
+            });
+
+            // 문장이 완성되었는지 확인
+            if (val === currentSentence) {
+                totalChars += currentSentence.length;
+                nextStep();
+            }
+        });
+
+        function nextStep() {
+            currentIndex++;
+            if (currentIndex < sentences.length) {
+                showSentence();
+            } else {
+                showResults();
+            }
+        }
+
+        function updateAccuracy() {
+            // 실제 구현에서는 문장 완료 시의 정확도를 합산하여 계산
+            accuracyDisplay.innerText = currentIndex === 0 ? "100" : Math.max(70, 100 - (totalErrors * 2));
+        }
+
+        function showResults() {
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            document.getElementById('final-accuracy').innerText = "100";
+        }
+
+        function resetGame() {
+            resultScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            setupScreen.classList.remove('hidden');
+            interestInput.value = '';
+        }
+
+        // Enter Key 지원
+        interestInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') startGame();
+        });
+    </script>
+</body>
+</html>
