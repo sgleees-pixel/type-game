@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Type Master</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;600;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="game-container">
+        <header>
+            <h1>NEON TYPE</h1>
+            <div class="stats">
+                <div class="stat-box">
+                    <span class="label">SCORE</span>
+                    <span class="value" id="score">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="label">TIME</span>
+                    <span class="value" id="time">60</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-area" id="game-area">
+            <div id="start-screen" class="screen active">
+                <h2>Ready?</h2>
+                <button id="start-btn">START GAME</button>
+            </div>
+            
+            <div id="game-over-screen" class="screen hidden">
+                <h2>GAME OVER</h2>
+                <p>Final Score: <span id="final-score">0</span></p>
+                <button id="restart-btn">PLAY AGAIN</button>
+            </div>
+
+            <div class="word-container" id="word-container">
+                <!-- Words will appear here -->
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="word-input" placeholder="Type here..." autocomplete="off">
+        </div>
+    </div>
+
+    <script src="../js/game.js"></script>
+</body>
+</html>
